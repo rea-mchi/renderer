@@ -162,5 +162,5 @@ bool TgaImage::FlipVertically() { return true; }
 
 void TgaImage::SetColor(int x, int y, const TgaColor& color) {
   if (data_.empty() || x < 0 || y < 0 || x >= width_ || y >= height_) return;
-  std::memcpy(data_.data() + (x + y * width_) * bytespp_, &color.r, bytespp_);
+  std::memcpy(data_.data() + (x + y * width_) * bytespp_, &color, bytespp_);
 }
