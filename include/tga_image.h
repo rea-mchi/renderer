@@ -36,15 +36,17 @@ struct TgaHeader {
 };
 #pragma pack(pop)
 
+// pixel color
+// 顺序bgra是因为TGA是little-endian format，而我们写入像素颜色是通过memcpy
 struct TgaColor {
-  std::int8_t r;
-  std::int8_t g;
   std::int8_t b;
+  std::int8_t g;
+  std::int8_t r;
   std::int8_t a;
 
   TgaColor() = default;
   TgaColor(std::uint8_t r, std::uint8_t g, std::uint8_t b, std::uint8_t a)
-      : r(r), g(g), b(b), a(a) {}
+      : b(b), g(g), r(r), a(a) {}
   TgaColor(const TgaColor& color) = default;
 };
 
