@@ -6,13 +6,25 @@
 
 #include "include/geometry.h"
 
-// 读取Wavefront.obj文件并存储其中数据
+// 读取Wavefront.obj文件并存储其中数据.
+// vertices_ 几何顶点坐标;
+// normals_ 顶点法线，单位向量;
+// faces_ 三角面元 存储顶点index;
+// faces_normals_ 三角面元每个顶点法线的index;
 class ObjModel {
  public:
-  std::vector<Vector3F> vertices_;
-  std::vector<Vector3Int> faces_;
-
   explicit ObjModel(const std::string& filename);
+  Vector3F GetVertex(int index) const;
+  Vector3F GetNormal(int index) const;
+  Vector3Int GetFace(int index) const;
+  std::size_t GetFaceNum() const;
+  Vector3Int GetFaceNormals(int index) const;
+
+ private:
+  std::vector<Vector3F> vertices_;
+  std::vector<Vector3F> normals_;
+  std::vector<Vector3Int> faces_;
+  std::vector<Vector3Int> faces_normals_;
 };
 
 // Wavefront.obj的文件格式中，面元数据行格式为f v1/vt1/vn1 v2/vt2/vn2

@@ -98,8 +98,10 @@ void TriangleByBB(int x0, int y0, int x1, int y1, int x2, int y2,
   int dx2 = x2 - x0;
   int multiplier = (x0 - x2) * dy + (y2 - y0) * dx;
   if (0 == multiplier) {
-    // The three vertices cannot represent a triangle.
-    // draw count
+    // The three vertices cannot represent a triangle. Maybe a line or a point.
+    if (0 != dx) DrawLine(x0, y0, x1, y1, image, color);
+    if (0 != dx2) DrawLine(x0, y0, x2, y2, image, color);
+    if (x1 != x2) DrawLine(x1, y1, x2, y2, image, color);
   }
   for (int i = xmin; i <= xmax; ++i) {
     for (int j = ymin; j <= ymax; ++j) {
@@ -145,10 +147,12 @@ void readModel() {
   int height = 800;
   ObjModel head("/home/tea/my-renderer/obj/african_head.obj");
   TgaImage image(width, height, TgaImage::kRGB);
-  for (const auto& face : head.faces_) {
-    Vector3F v0 = head.vertices_[face[0]];
-    Vector3F v1 = head.vertices_[face[1]];
-    Vector3F v2 = head.vertices_[face[2]];
+  int face_num = head.GetFaceNum();
+  for (int i = 0; i < face_num; ++i) {
+    Vector3Int face = head.GetFace(i);
+    Vector3F v0 = head.GetVertex(face[0]);
+    Vector3F v1 = head.GetVertex(face[1]);
+    Vector3F v2 = head.GetVertex(face[2]);
     Vector2Int sv0((v0.x + 1.) * width / 2., (v0.y + 1.) * height / 2.);
     Vector2Int sv1((v1.x + 1.) * width / 2., (v1.y + 1.) * height / 2.);
     Vector2Int sv2((v2.x + 1.) * width / 2., (v2.y + 1.) * height / 2.);
