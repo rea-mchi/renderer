@@ -1,5 +1,6 @@
 #include <algorithm>
 #include <iostream>
+#include <limits>
 
 #include "include/geometry.h"
 #include "include/model.h"
@@ -85,48 +86,64 @@ void TriangleByLineSwap(int x0, int y0, int x1, int y1, int x2, int y2,
 
 // draw a triangle by bounding box method.
 // 检查包围盒内所有像素，利用三角形重心坐标判断像素是否位于三角形内，如果是，就上色。
-// 重心坐标计算式: OP = (1-u-v)OA + uOB + vOC.
-void TriangleByBB(int x0, int y0, int x1, int y1, int x2, int y2,
+// 三角形重心坐标形如OP = (1-u-v)OA + uOB + vOC
+// @param zbuffer size为像素个数的vector，用来记录各个像素当前最大z-value.
+void TriangleByBB(const Vector3F& vertex0, const Vector3F& vertex1,
+                  const Vector3F& vertex2, std::vector<double>& zbuffer,
                   TgaImage* image, const TgaColor& color) {
-  int xmin = std::min(x0, std::min(x1, x2));  // optimization possible?
-  int xmax = std::max(x0, std::max(x1, x2));
-  int ymin = std::min(y0, std::min(y1, y2));
-  int ymax = std::max(y0, std::max(y1, y2));
+  // optimization possible?
+  double xmin = std::floor(std::min(vertex0.x, std::min(vertex1.x, vertex2.x)));
+  double xmax = std::ceil(std::max(vertex0.x, std::max(vertex1.x, vertex2.x)));
+  double ymin = std::floor(std::min(vertex0.y, std::min(vertex1.y, vertex2.y)));
+  double ymax = std::ceil(std::max(vertex0.y, std::max(vertex1.y, vertex2.y)));
 
-  int dy = y1 - y0;
-  int dx = x1 - x0;
-  int dx2 = x2 - x0;
-  int multiplier = (x0 - x2) * dy + (y2 - y0) * dx;
-  if (0 == multiplier) {
+  double dx = vertex1.x - vertex0.x;
+  double dy = vertex1.y - vertex0.y;
+  double dx2 = vertex2.x - vertex0.x;
+  double dy2 = vertex2.y - vertex0.y;
+  double v_multiplier = dx * dy2 - dy * dx2;
+  if (0 == v_multiplier) {
     // The three vertices cannot represent a triangle. Maybe a line or a point.
-    if (0 != dx) DrawLine(x0, y0, x1, y1, image, color);
-    if (0 != dx2) DrawLine(x0, y0, x2, y2, image, color);
-    if (x1 != x2) DrawLine(x1, y1, x2, y2, image, color);
+    // Note that implicit conversion from double to int!
+    if (0 != dx)
+      DrawLine(vertex0.x, vertex0.y, vertex1.x, vertex1.y, image, color);
+    if (0 != dx2)
+      DrawLine(vertex0.x, vertex0.y, vertex2.x, vertex2.y, image, color);
+    if (vertex1.x != vertex2.x)
+      DrawLine(vertex1.x, vertex1.y, vertex2.x, vertex2.y, image, color);
+    return;
   }
+  int width = image->width_;
   for (int i = xmin; i <= xmax; ++i) {
     for (int j = ymin; j <= ymax; ++j) {
-      int dytemp = j - y0;
-      int dxtemp = i - x0;
-      double v = (dytemp * dx - dxtemp * dy) * 1. / multiplier;
-      double u = (dxtemp - v * dx2) / dx;
-      if (0 <= u && 1 >= u && 0 <= v && 1 >= v && 1 >= (u + v)) {
+      double dx_p = i * 1. - vertex0.x;
+      double dy_p = j * 1. - vertex0.y;
+      double v = (dy_p * dx - dx_p * dy) / v_multiplier;
+      double u = (dx_p - v * dx2) / dx;
+      if (0 <= u && 0 <= v && 0 <= 1. - u - v) {
+        double z_p = (1. - u - v) * vertex0.z + u * vertex1.z + v * vertex2.z;
+        int pixel_index = j * width + i;
+        if (z_p > zbuffer[pixel_index]) {
+          zbuffer[pixel_index] = z_p;
+          image->SetColor(i, j, color);
+        }
         image->SetColor(i, j, color);
       }
     }
   }
 }
 
-void DrawTriangle(const Vector2Int& vertex0, const Vector2Int& vectex1,
-                  const Vector2Int& vertex2, TgaImage* image,
-                  const TgaColor& color) {
+void DrawTriangle(const Vector3F& vertex0, const Vector3F& vertex1,
+                  const Vector3F& vertex2, std::vector<double>& zbuffer,
+                  TgaImage* image, const TgaColor& color) {
   if (!image) {
     std::cerr << "Null image pointer was past.\n";
     return;
   }
-  // TriangleByLineSwap(vertex0.x, vertex0.y, vectex1.x, vectex1.y, vertex2.x,
+  // TriangleByLineSwap(vertex0.x, vertex0.y, vertex1.x, vertex1.y, vertex2.x,
   //                    vertex2.y, image, color);
-  TriangleByBB(vertex0.x, vertex0.y, vectex1.x, vectex1.y, vertex2.x, vertex2.y,
-               image, color);
+
+  TriangleByBB(vertex0, vertex1, vertex2, zbuffer, image, color);
 }
 
 void readModel();
@@ -148,15 +165,17 @@ void readModel() {
 
   ObjModel head("/home/tea/my-renderer/obj/african_head.obj");
   TgaImage image(width, height, TgaImage::kRGB);
+  int pixel_num = width * height;
+  std::vector<double> zbuffer(pixel_num, std::numeric_limits<double>::lowest());
   int face_num = head.GetFaceNum();
   for (int i = 0; i < face_num; ++i) {
     Vector3Int face = head.GetFace(i);
     Vector3F v0 = head.GetVertex(face[0]);
     Vector3F v1 = head.GetVertex(face[1]);
     Vector3F v2 = head.GetVertex(face[2]);
-    Vector2Int sv0((v0.x + 1.) * width / 2., (v0.y + 1.) * height / 2.);
-    Vector2Int sv1((v1.x + 1.) * width / 2., (v1.y + 1.) * height / 2.);
-    Vector2Int sv2((v2.x + 1.) * width / 2., (v2.y + 1.) * height / 2.);
+    Vector3F sv0((v0.x + 1.) * width / 2., (v0.y + 1.) * height / 2., v0.z);
+    Vector3F sv1((v1.x + 1.) * width / 2., (v1.y + 1.) * height / 2., v1.z);
+    Vector3F sv2((v2.x + 1.) * width / 2., (v2.y + 1.) * height / 2., v2.z);
     Vector3F vec01(v1.x - v0.x, v1.y - v0.y, v1.z - v0.z);
     Vector3F vec02(v2.x - v0.x, v2.y - v0.y, v2.z - v0.z);
     Vector3F n = vector3::Cross(vec02, vec01);
@@ -164,8 +183,8 @@ void readModel() {
 
     if (intensity > 0) {
       DrawTriangle(
-          sv0, sv1, sv2, &image,
-          TgaColor(intensity * 255, intensity * 255, intensity * 255, 255));
+          sv0, sv1, sv2, zbuffer, &image,
+          TgaColor(255 * intensity, 255 * intensity, 255 * intensity, 255));
     }
   }
   image.WriteTgaFile("african-head.tga", false, false, false);

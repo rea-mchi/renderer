@@ -75,22 +75,18 @@ ObjModel::ObjModel(const std::string& filename) {
 
 ObjModel::~ObjModel() = default;
 
-Vector3F ObjModel::GetVertex(int index) const {
-  return Vector3F(vertices_[index]);
+const Vector3F& ObjModel::GetVertex(int index) const {
+  return vertices_[index];
 }
 
-Vector3F ObjModel::GetNormal(int index) const {
-  return Vector3F(normals_[index]);
-}
+const Vector3F& ObjModel::GetNormal(int index) const { return normals_[index]; }
 
-Vector3Int ObjModel::GetFace(int index) const {
-  return Vector3Int(faces_[index]);
-}
+const Vector3Int& ObjModel::GetFace(int index) const { return faces_[index]; }
 
 std::size_t ObjModel::GetFaceNum() const { return faces_.size(); }
 
-Vector3Int ObjModel::GetFaceNormals(int index) const {
-  return Vector3Int(faces_normals_[index]);
+const Vector3Int& ObjModel::GetFaceNormals(int index) const {
+  return faces_normals_[index];
 }
 
 std::array<std::string, 3> SplitObjFaceVertexString(
