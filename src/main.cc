@@ -145,6 +145,7 @@ int main(int argc, char const* argv[]) {
 void readModel() {
   int width = 800;
   int height = 800;
+
   ObjModel head("/home/tea/my-renderer/obj/african_head.obj");
   TgaImage image(width, height, TgaImage::kRGB);
   int face_num = head.GetFaceNum();
@@ -156,8 +157,16 @@ void readModel() {
     Vector2Int sv0((v0.x + 1.) * width / 2., (v0.y + 1.) * height / 2.);
     Vector2Int sv1((v1.x + 1.) * width / 2., (v1.y + 1.) * height / 2.);
     Vector2Int sv2((v2.x + 1.) * width / 2., (v2.y + 1.) * height / 2.);
-    DrawTriangle(sv0, sv1, sv2, &image,
-                 TgaColor(rand() % 255, rand() % 255, rand() % 255, 255));
+    Vector3F vec01(v1.x - v0.x, v1.y - v0.y, v1.z - v0.z);
+    Vector3F vec02(v2.x - v0.x, v2.y - v0.y, v2.z - v0.z);
+    Vector3F n = vector3::Cross(vec02, vec01);
+    double intensity = vector3::Normalize(n).z * (-1);
+
+    if (intensity > 0) {
+      DrawTriangle(
+          sv0, sv1, sv2, &image,
+          TgaColor(intensity * 255, intensity * 255, intensity * 255, 255));
+    }
   }
   image.WriteTgaFile("african-head.tga", false, false, false);
 }

@@ -12,6 +12,7 @@ TgaImage::TgaImage(int width, int height, int bytespp)
       height_(height),
       bytespp_(bytespp) {}
 TgaImage::TgaImage(const TgaImage& image) = default;
+TgaImage::~TgaImage() = default;
 
 bool TgaImage::ReadTgaFile(const std::string& filename) {
   std::ifstream in;

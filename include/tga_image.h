@@ -66,6 +66,7 @@ class TgaImage {
   TgaImage();
   TgaImage(int width, int height, int bytespp);
   TgaImage(const TgaImage& image);
+  ~TgaImage();
   bool ReadTgaFile(const std::string& filename);
   bool WriteTgaFile(const std::string& filename, bool horizontal_flip,
                     bool vertical_flip, bool rle) const;

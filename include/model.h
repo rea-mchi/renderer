@@ -1,6 +1,7 @@
 #ifndef MODEL_H_
 #define MODEL_H_
 
+#include <array>
 #include <string>
 #include <vector>
 
@@ -14,6 +15,7 @@
 class ObjModel {
  public:
   explicit ObjModel(const std::string& filename);
+  ~ObjModel();
   Vector3F GetVertex(int index) const;
   Vector3F GetNormal(int index) const;
   Vector3Int GetFace(int index) const;
@@ -28,9 +30,10 @@ class ObjModel {
 };
 
 // Wavefront.obj的文件格式中，面元数据行格式为f v1/vt1/vn1 v2/vt2/vn2
-// v3/vt3/vn3。 该函数负责将形如v1/vt/vn1的字符串转化为{v1,vt,vn1}的矢量形式。
+// v3/vt3/vn3。 该函数负责将形如v1/vt/vn1的字符串转化为{v1,vt,vn1}的数组形式。
 // @param vertex_data 形如v1/vt/vn1的字符串。
-std::vector<std::string> SplitObjFaceVertexString(
+// 使用数组减少堆内存碎片。
+std::array<std::string, 3> SplitObjFaceVertexString(
     const std::string& vertex_data);
 
 #endif  // MODEL_H_

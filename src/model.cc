@@ -1,6 +1,7 @@
 #include "include/model.h"
 
 #include <algorithm>
+#include <array>
 #include <fstream>
 #include <iostream>
 #include <limits>
@@ -49,7 +50,7 @@ ObjModel::ObjModel(const std::string& filename) {
         normal[i] = std::stod(value);
         ++i;
       }
-      normals_.push_back(normal.Normalize());
+      normals_.push_back(vector3::Normalize(normal));
     } else if (0 == line.compare(0, 2, "f ")) {
       // polygonal face elemnt
       iss.ignore(std::numeric_limits<std::streamsize>::max(), ' ');
@@ -59,9 +60,10 @@ ObjModel::ObjModel(const std::string& filename) {
       int i = 0;
       while (3 > i) {
         iss >> vertex_data;
-        std::vector<std::string> vertex = SplitObjFaceVertexString(vertex_data);
-        face_vertices[i] = std::stoi(vertex[0]) - 1;
-        face_normals[i] = std::stoi(vertex[2]) - 1;
+        std::array<std::string, 3> vertex_strs =
+            SplitObjFaceVertexString(vertex_data);
+        face_vertices[i] = std::stoi(vertex_strs[0]) - 1;
+        face_normals[i] = std::stoi(vertex_strs[2]) - 1;
         ++i;
       }
       faces_.push_back(face_vertices);
@@ -71,20 +73,7 @@ ObjModel::ObjModel(const std::string& filename) {
   in.close();
 }
 
-std::vector<std::string> SplitObjFaceVertexString(
-    const std::string& vertex_data) {
-  std::vector<std::string> data;
-  int len = vertex_data.length();
-  int last = 0;
-  for (int i = 0; i < len; ++i) {
-    if ('/' == vertex_data[i]) {
-      data.push_back(vertex_data.substr(last, i - last));
-      last = i + 1;
-    }
-  }
-  data.push_back(vertex_data.substr(last));
-  return data;
-}
+ObjModel::~ObjModel() = default;
 
 Vector3F ObjModel::GetVertex(int index) const {
   return Vector3F(vertices_[index]);
@@ -102,4 +91,21 @@ std::size_t ObjModel::GetFaceNum() const { return faces_.size(); }
 
 Vector3Int ObjModel::GetFaceNormals(int index) const {
   return Vector3Int(faces_normals_[index]);
+}
+
+std::array<std::string, 3> SplitObjFaceVertexString(
+    const std::string& vertex_data) {
+  std::array<std::string, 3> data;
+  int len = vertex_data.length();
+  int last = 0;
+  int cur = 0;
+  for (int i = 0; i < len; ++i) {
+    if ('/' == vertex_data[i]) {
+      data[cur] = vertex_data.substr(last, i - last);
+      last = i + 1;
+      cur++;
+    }
+  }
+  data[cur] = vertex_data.substr(last);
+  return data;
 }
