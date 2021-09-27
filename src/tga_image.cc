@@ -27,12 +27,12 @@ bool TgaImage::ReadTgaFile(const std::string& filename) {
   in.read(reinterpret_cast<char*>(&header), sizeof(header));
   if (!in.good()) {
     in.close();
-    std::cerr << "An error occurred while reading header in file.\n";
+    std::cerr << "An error occurred while reading header of file.\n";
     return false;
   }
   width_ = static_cast<int>(header.image_width);
   height_ = static_cast<int>(header.image_height);
-  bytespp_ = static_cast<int>(header.pixel_depth >> 3);
+  bytespp_ = static_cast<int>(header.bits_per_pixel >> 3);
   if (width_ <= 0) {
     in.close();
     std::cerr << "Non-positive value of width: " << width_ << ".\n";
@@ -48,10 +48,10 @@ bool TgaImage::ReadTgaFile(const std::string& filename) {
     std::cerr << "Unknown format. Bytes per pixel is: " << bytespp_ << ".\n";
     return false;
   }
-  size_t bytes_num = width_ * height_ * bytespp_;
+  std::size_t bytes_num = width_ * height_ * bytespp_;
   int image_type = static_cast<int>(header.image_data_type);
-  data_ = std::vector<std::uint8_t>(bytes_num, 0);
   if (3 == image_type || 2 == image_type) {
+    data_ = std::vector<std::uint8_t>(bytes_num, 0);
     in.read(reinterpret_cast<char*>(data_.data()), bytes_num);
     if (!in.good()) {
       in.close();
@@ -59,7 +59,8 @@ bool TgaImage::ReadTgaFile(const std::string& filename) {
       return false;
     }
   } else if (10 == image_type || 11 == image_type) {
-    //
+    std::cerr << "The file uses RLE compression. Do decompression.\n";
+    DecompressRLE(in, bytes_num, bytespp_);
   } else {
     in.close();
     if (1 == image_type || 9 == image_type) {
@@ -109,7 +110,7 @@ bool TgaImage::WriteTgaFile(const std::string& filename, bool horizontal_flip,
       (bytespp_ == kGrayscale ? (rle ? 11 : 3) : (rle ? 10 : 2));
   header.image_width = width_;
   header.image_height = height_;
-  header.pixel_depth = bytespp_ << 3;
+  header.bits_per_pixel = bytespp_ << 3;
   std::uint8_t descriptor = 0;
   if (horizontal_flip) descriptor |= (1 << 4);
   if (vertical_flip) descriptor |= (1 << 5);
@@ -157,11 +158,64 @@ bool TgaImage::WriteTgaFile(const std::string& filename, bool horizontal_flip,
   return true;
 }
 
-bool TgaImage::ReadRleImageData(const std::ifstream& in) { return true; }
-bool TgaImage::FlipHorizontally() { return true; }
-bool TgaImage::FlipVertically() { return true; }
+bool TgaImage::DecompressRLE(std::ifstream& in, const std::size_t bytes_num,
+                             const int bytespp) {
+  data_ = std::vector<std::uint8_t>(bytes_num, 0);
+  int cur_byte_loc = 0;
+  char temp;
+  std::uint32_t pixel;
+  while (cur_byte_loc < bytes_num) {
+    in.read(&temp, 1);
+    if (!in.good()) {
+      std::cerr << "An error occurred while decompressing RLE (reading packet "
+                   "mode).\n";
+      return false;
+    }
+    int n = (temp & 0x7F) + 1;  // 0x7F = 01111111 = 127
+    if (temp & 0x80) {
+      in.read(reinterpret_cast<char*>(&pixel), bytespp);
+      if (!in.good()) {
+        std::cerr << "An error occurred while decompressing RLE (reading "
+                     "compressed pixel packet).\n";
+        return false;
+      }
+      for (int i = 0; i < n; ++i) {
+        std::memcpy(&data_[cur_byte_loc], &pixel, bytespp);
+        cur_byte_loc += bytespp;
+      }
+    } else {
+      in.read(reinterpret_cast<char*>(&data_[cur_byte_loc]), n * bytespp);
+      cur_byte_loc += n * bytespp;
+      if (!in.good()) {
+        std::cerr << "An error occurred while decompressing RLE (reading "
+                     "uncompressed pixel packet).\n";
+        return false;
+      }
+    }
+  }
+  return true;
+}
+
+bool TgaImage::FlipHorizontally() {
+  std::cerr << "flip horizontally.\n";
+  return true;
+}
+bool TgaImage::FlipVertically() {
+  std::cerr << "flip vertically.\n";
+  return true;
+}
 
 void TgaImage::SetColor(int x, int y, const TgaColor& color) {
   if (data_.empty() || x < 0 || y < 0 || x >= width_ || y >= height_) return;
   std::memcpy(data_.data() + (x + y * width_) * bytespp_, &color, bytespp_);
+}
+
+TgaColor TgaImage::GetColor(int x, int y) const {
+  if (data_.empty() || x < 0 || y < 0 || x >= width_ || y >= height_)
+    return TgaColor(255, 255, 255, 255);
+  TgaColor color;
+  for (int i = 0; i < bytespp_; ++i) {
+    color[i] = data_[(x + y * width_) * bytespp_ + i];
+  }
+  return color;
 }
