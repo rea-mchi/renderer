@@ -105,46 +105,40 @@ void TriangleByBB(const Vector3F& v0, const Vector3F& v1, const Vector3F& v2,
                   std::vector<double>& zbuffer, const TgaImage& texture,
                   const double camera_z, const double screen_z,
                   TgaImage* image) {
-  Vector3F pp_v0 = PerspectiveProjectionTransformation(
-      v0, camera_z, screen_z, image->width_, image->height_);
-  Vector3F pp_v1 = PerspectiveProjectionTransformation(
-      v1, camera_z, screen_z, image->width_, image->height_);
-  Vector3F pp_v2 = PerspectiveProjectionTransformation(
-      v2, camera_z, screen_z, image->width_, image->height_);
-
   // optimization possible?
-  double xmin = std::floor(std::min(pp_v0.x, std::min(pp_v1.x, pp_v2.x)));
-  double xmax = std::ceil(std::max(pp_v0.x, std::max(pp_v1.x, pp_v2.x)));
-  double ymin = std::floor(std::min(pp_v0.y, std::min(pp_v1.y, pp_v2.y)));
-  double ymax = std::ceil(std::max(pp_v0.y, std::max(pp_v1.y, pp_v2.y)));
+  double xmin = std::floor(std::min(v0.x, std::min(v1.x, v2.x)));
+  double xmax = std::ceil(std::max(v0.x, std::max(v1.x, v2.x)));
+  double ymin = std::floor(std::min(v0.y, std::min(v1.y, v2.y)));
+  double ymax = std::ceil(std::max(v0.y, std::max(v1.y, v2.y)));
 
-  double dx = pp_v1.x - pp_v0.x;
-  double dy = pp_v1.y - pp_v0.y;
-  double dx2 = pp_v2.x - pp_v0.x;
-  double dy2 = pp_v2.y - pp_v0.y;
+  double dx = v1.x - v0.x;
+  double dy = v1.y - v0.y;
+  double dx2 = v2.x - v0.x;
+  double dy2 = v2.y - v0.y;
   double a2_multiplier = dx * dy2 - dy * dx2;
   if (0 == a2_multiplier) {
     // The three vertices cannot represent a triangle. Maybe a line or a point.
     return;
   }
-  int width = image->width_;
+  // int width = image->width_;
+  int width = image->GetWidth();
   for (int i = xmin; i <= xmax; ++i) {
     for (int j = ymin; j <= ymax; ++j) {
-      double dx_p = i * 1. - pp_v0.x;
-      double dy_p = j * 1. - pp_v0.y;
+      double dx_p = i * 1. - v0.x;
+      double dy_p = j * 1. - v0.y;
       // uv can multipled by dx*v_multiplier to reduce division calculation cost
       double a2 = (dy_p * dx - dx_p * dy) / a2_multiplier;
       double a1 = (dx_p - a2 * dx2) / dx;
       double a0 = 1. - a1 - a2;
       if (0 <= a0 && 0 <= a1 && 0 <= a2) {
-        double z_p = a0 * pp_v0.z + a1 * pp_v1.z + a2 * pp_v2.z;
+        double z_p = a0 * v0.z + a1 * v1.z + a2 * v2.z;
         int pixel_index = j * width + i;
         if (z_p > zbuffer[pixel_index]) {
           zbuffer[pixel_index] = z_p;
           int u = static_cast<int>((a0 * vt0.x + a1 * vt1.x + a2 * vt2.x) *
-                                   texture.width_);
+                                   texture.GetWidth());
           int v = static_cast<int>((a0 * vt0.y + a1 * vt1.y + a2 * vt2.y) *
-                                   texture.height_);
+                                   texture.GetHeight());
           image->SetColor(i, j, texture.GetColor(u, v));
         }
       }
@@ -152,9 +146,8 @@ void TriangleByBB(const Vector3F& v0, const Vector3F& v1, const Vector3F& v2,
   }
 }
 
-void DrawTriangle(const Vector3F& vertex0, const Vector3F& vertex1,
-                  const Vector3F& vertex2, const Vector2F& uv0,
-                  const Vector2F& uv1, const Vector2F& uv2,
+void DrawTriangle(const Vector3F& v0, const Vector3F& v1, const Vector3F& v2,
+                  const Vector2F& vt0, const Vector2F& vt1, const Vector2F& vt2,
                   std::vector<double>& zbuffer, const TgaImage& texture,
                   const double camera_z, const double screen_z,
                   TgaImage* image) {
@@ -167,11 +160,21 @@ void DrawTriangle(const Vector3F& vertex0, const Vector3F& vertex1,
     return;
   }
 
-  // TriangleByLineSwap(vertex0.x, vertex0.y, vertex1.x, vertex1.y, vertex2.x,
-  //                    vertex2.y, image, white);
+  int sc_width = image->GetWidth();
+  int sc_height = image->GetHeight();
 
-  TriangleByBB(vertex0, vertex1, vertex2, uv0, uv1, uv2, zbuffer, texture,
-               camera_z, screen_z, image);
+  Vector3F sc_v0 = PerspectiveProjectionTransformation(v0, camera_z, screen_z,
+                                                       sc_width, sc_height);
+  Vector3F sc_v1 = PerspectiveProjectionTransformation(v1, camera_z, screen_z,
+                                                       sc_width, sc_height);
+  Vector3F sc_v2 = PerspectiveProjectionTransformation(v2, camera_z, screen_z,
+                                                       sc_width, sc_height);
+
+  // TriangleByLineSwap(sc_v0.x, sc_v0.y, sc_v1.x, sc_v1.y, sc_v2.x, sc_v2.y,
+  //                    image, white);
+
+  TriangleByBB(sc_v0, sc_v1, sc_v2, vt0, vt1, vt2, zbuffer, texture, camera_z,
+               screen_z, image);
 }
 
 void readModel();
@@ -192,8 +195,8 @@ void readModel() {
   int height = 800;
 
   ObjModel* head = new ObjModel("/home/tea/my-renderer/obj/african_head.obj");
-  TgaImage* image = new TgaImage(width, height, TgaImage::kRGB);
   TgaImage* texture = new TgaImage();
+  TgaImage* image = new TgaImage(width, height, TgaImage::kRGB);
   texture->ReadTgaFile("/home/tea/my-renderer/obj/african_head_diffuse.tga");
 
   int pixel_num = width * height;
@@ -214,8 +217,5 @@ void readModel() {
   std::cerr << "Finish rasterization.\n";
   image->WriteTgaFile("african-head.tga", false, false, false);
   std::cerr << "Image IO finish.\n";
-  delete head;
-  delete image;
-  delete texture;
   return;
 }

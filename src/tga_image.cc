@@ -5,7 +5,7 @@
 #include <iostream>
 #include <string>
 
-TgaImage::TgaImage() = default;
+TgaImage::TgaImage() : width_(0), height_(0), bytespp_(0) {}
 TgaImage::TgaImage(int width, int height, int bytespp)
     : data_(width * height * bytespp, 0),
       width_(width),
@@ -13,6 +13,12 @@ TgaImage::TgaImage(int width, int height, int bytespp)
       bytespp_(bytespp) {}
 TgaImage::TgaImage(const TgaImage& image) = default;
 TgaImage::~TgaImage() = default;
+
+int TgaImage::GetWidth() const { return width_; }
+
+int TgaImage::GetHeight() const { return height_; }
+
+int TgaImage::GetBytespp() const { return bytespp_; }
 
 bool TgaImage::ReadTgaFile(const std::string& filename) {
   std::ifstream in;
@@ -49,9 +55,9 @@ bool TgaImage::ReadTgaFile(const std::string& filename) {
     return false;
   }
   std::size_t bytes_num = width_ * height_ * bytespp_;
+  data_ = std::vector<std::uint8_t>(bytes_num, 0);
   int image_type = static_cast<int>(header.image_data_type);
   if (3 == image_type || 2 == image_type) {
-    data_ = std::vector<std::uint8_t>(bytes_num, 0);
     in.read(reinterpret_cast<char*>(data_.data()), bytes_num);
     if (!in.good()) {
       in.close();
@@ -59,7 +65,7 @@ bool TgaImage::ReadTgaFile(const std::string& filename) {
       return false;
     }
   } else if (10 == image_type || 11 == image_type) {
-    std::cerr << "The file uses RLE compression. Do decompression.\n";
+    std::cerr << "The file uses RLE compression.\n";
     DecompressRLE(in, bytes_num, bytespp_);
   } else {
     in.close();
@@ -95,9 +101,7 @@ bool TgaImage::WriteTgaFile(const std::string& filename, bool horizontal_flip,
                             bool vertical_flip, bool rle) const {
   std::uint32_t extension_area_offset = 0;
   std::uint32_t dev_area_offset = 0;
-  std::vector<std::uint8_t> footer_signature{'T', 'R', 'U', 'E', 'V', 'I',
-                                             'S', 'I', 'O', 'N', '-', 'X',
-                                             'F', 'I', 'L', 'E', '.', '\0'};
+  std::string footer_signature("TRUEVISION-XFILE.");
   std::ofstream out;
   out.open(filename.c_str(), std::ios::trunc | std::ios::binary);
   if (!out.is_open()) {
@@ -147,8 +151,7 @@ bool TgaImage::WriteTgaFile(const std::string& filename, bool horizontal_flip,
         << "An error occurred while writing developer area offset in file.\n";
     return false;
   }
-  out.write(reinterpret_cast<char*>(footer_signature.data()),
-            sizeof(footer_signature));
+  out.write(footer_signature.c_str(), sizeof(footer_signature));
   if (!out.good()) {
     out.close();
     std::cerr << "An error occurred while writing signature in file.\n";
@@ -160,7 +163,6 @@ bool TgaImage::WriteTgaFile(const std::string& filename, bool horizontal_flip,
 
 bool TgaImage::DecompressRLE(std::ifstream& in, const std::size_t bytes_num,
                              const int bytespp) {
-  data_ = std::vector<std::uint8_t>(bytes_num, 0);
   int cur_byte_loc = 0;
   char temp;
   std::uint32_t pixel;
