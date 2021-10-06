@@ -1,110 +1,85 @@
 #ifndef GEOMETRY_H_
 #define GEOMETRY_H_
 
-#include <cmath>
-#include <iostream>
-#include <vector>
+#include <array>
 
-template <typename T>
-struct Vector3 {
-  T x, y, z;
-  Vector3() : x(0), y(0), z(0) {}
-  Vector3(T x, T y, T z) : x(x), y(y), z(z) {}
-  Vector3(const Vector3& vector) : x(vector.x), y(vector.y), z(vector.z) {}
+template <typename T, int N>
+class Vector {
+ public:
+  Vector();
+  Vector(std::initializer_list<T> list);
+  Vector(const Vector& vector);
+  Vector& operator=(const Vector& rhs);
+  ~Vector();
+  T& operator[](std::size_t n);
+  const T& operator[](std::size_t n) const;
+  double Norm() const;
+  T& x();
+  T& y();
+  T& z();
+  T& w();
 
-  T& operator[](const size_t index) {
-    if (index < 0 || index > 2) {
-      throw std::out_of_range("Invalid index!\n");
-    }
-    if (0 == index) {
-      return x;
-    } else if (1 == index) {
-      return y;
-    } else {
-      return z;
-    }
-  }
-
-  const T& operator[](const size_t index) const {
-    if (index < 0 || index > 2) {
-      throw std::out_of_range("Invalid index!\n");
-    }
-    if (0 == index) {
-      return x;
-    } else if (1 == index) {
-      return y;
-    } else {
-      return z;
-    }
-  }
+ private:
+  std::array<T, N> data_;
 };
 
-using Vector3Int = Vector3<int>;
-using Vector3F = Vector3<double>;
+template <typename T, int N>
+Vector<T, N> operator+(const Vector<T, N>& lhs, const T& rhs);
+template <typename T, int N>
+Vector<T, N> operator-(const Vector<T, N>& lhs, const T& rhs);
+template <typename T, int N>
+Vector<T, N> operator*(const Vector<T, N>& lhs, const T& rhs);
+template <typename T, int N>
+Vector<T, N> operator*(const T& lhs, const Vector<T, N>& rhs);
+template <typename T, int N>
+Vector<T, N> operator/(const Vector<T, N>& lhs, const T& rhs);
+template <typename T, int N>
+Vector<T, N> operator+(const Vector<T, N>& lhs, const Vector<T, N>& rhs);
+template <typename T, int N>
+Vector<T, N> operator-(const Vector<T, N>& lhs, const Vector<T, N>& rhs);
 
-namespace vector3 {
-template <typename T>
-Vector3F Normalize(Vector3<T> vec) {
-  double norm = std::sqrt(x * x + y * y + z * z);
-  return Vector3F(x / norm, y / norm, z / norm);
-}
+namespace vector_m {
+template <int N>
+double Dot(Vector<double, N> v1, Vector<double, N> v2);
 
-template <typename T>
-Vector3<T> Cross(Vector3<T> a, Vector3<T> b) {
-  return Vector3<T>(a.y * b.z - a.z * b.y, a.z * b.x - a.x * b.z,
-                    a.x * b.y - a.y * b.x);
-}
+Vector<double, 3> Cross(Vector<double, 2> v1, Vector<double, 2> v2);
+Vector<double, 3> Cross(Vector<double, 3> v1, Vector<double, 3> v2);
 
-template <typename T>
-T Dot(Vector3<T> a, Vector3<T> b) {
-  return a.x * b.x + a.y * b.y + a.z * b.z;
-}
-}  // namespace vector3
+template <int N>
+Vector<double, N> Normalize(Vector<double, N> v);
+}  // namespace vector_m
 
-template <typename T>
-struct Vector2 {
-  T x, y;
-  Vector2() : x(0), y(0) {}
-  Vector2(T x, T y) : x(x), y(y) {}
-  Vector2(const Vector2& vector) : x(vector.x), y(vector.y) {}
-  explicit Vector2(Vector3<T> vector3) : x(vector3.x), y(vector3.y) {}
+using Vector2 = Vector<double, 2>;
+using Vector2Int = Vector<int, 2>;
+using Vector3 = Vector<double, 3>;
+using Vector3Int = Vector<int, 3>;
+using Vector4 = Vector<double, 4>;
 
-  T& operator[](const size_t index) {
-    if (index < 0 || index > 1) {
-      throw std::out_of_range("Invalid index!\n");
-    }
-    if (0 == index) {
-      return x;
-    } else {
-      return y;
-    }
-  }
+template <typename T, int ROW, int COL>
+class Matrix {
+ public:
+  Matrix();
+  Matrix(const Matrix& m);
+  Matrix& operator=(const Matrix& rhs);
+  ~Matrix();
+  T& operator()(int i, int j);
+  Matrix Transpose();
 
-  const T& operator[](const size_t index) const {
-    if (index < 0 || index > 1) {
-      throw std::out_of_range("Invalid index!\n");
-    }
-    if (0 == index) {
-      return x;
-    } else {
-      return y;
-    }
-  }
+ private:
+  std::array<T, ROW * COL> data_;
 };
 
-using Vector2Int = Vector2<int>;
-using Vector2F = Vector2<double>;
+// m[ROW][COM]*m[COM][COL]
+template <typename T, int ROW, int COM, int COL>
+Matrix<T, ROW, COL> operator*(const Matrix<T, ROW, COM>& lhs,
+                              const Matrix<T, COM, COL>& rhs);
 
-namespace vector2 {
-template <typename T>
-Vector3<T> Cross(Vector2<T> a, Vector2<T> b) {
-  return Vector3<T>(0, 0, a.x * b.y - a.y * b.x);
-}
+namespace matrix_m {
+Matrix<double, 3, 3> IMatrix3();
+Matrix<double, 4, 4> IMatrix4();
+}  // namespace matrix_m
 
-template <typename T>
-T Dot(Vector2<T> a, Vector2<T> b) {
-  return a.x * b.x + a.y * b.y;
-}
-}  // namespace vector2
+using SMatrix3 = Matrix<double, 3, 3>;
+using SMatrix4 = Matrix<double, 4, 4>;
 
 #endif  // GEOMETRY_H_
