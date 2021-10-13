@@ -1,13 +1,12 @@
-#include <algorithm>
+#include <array>
+#include <cmath>
 #include <iostream>
 #include <limits>
 
 #include "include/geometry.h"
 #include "include/model.h"
+#include "include/shader.h"
 #include "include/tga_image.h"
-
-TgaColor white(255, 255, 255, 255);
-TgaColor red(255, 0, 0, 255);
 
 // draw line use Bresenham's algs
 // 每单位x增长的dy正是k的值，k =
@@ -84,138 +83,80 @@ void TriangleByLineSwap(int x0, int y0, int x1, int y1, int x2, int y2,
   }
 }
 
-// 相机和视口都对准中心的透视投影
-// 由于数据坐标系范围是[-1,1]，转换后还要投射到屏幕坐标系，范围应为[0,width]
-Vector3F PerspectiveProjectionTransformation(const Vector3F& vertex,
-                                             const double camera_z,
-                                             const double screen_z,
-                                             const double screen_width,
-                                             const double screen_height) {
-  double coe = (camera_z - screen_z) / (camera_z - vertex.z);
-  return Vector3F((vertex.x * coe + 1.) * screen_width / 2.,
-                  (vertex.y * coe + 1.) * screen_height / 2., vertex.z);
-}
-
-// draw a triangle by bounding box method.
-// 检查包围盒内所有像素，利用三角形重心坐标判断像素是否位于三角形内，如果是，就上色。
-// 三角形重心坐标形如OP = (1-a_1-a_2)OA + a_1OB + a_2OC
-// @param zbuffer size为像素个数的vector，用来记录各个像素当前最大z-value.
-void TriangleByBB(const Vector3F& v0, const Vector3F& v1, const Vector3F& v2,
-                  const Vector2F& vt0, const Vector2F& vt1, const Vector2F& vt2,
-                  std::vector<double>& zbuffer, const TgaImage& texture,
-                  const double camera_z, const double screen_z,
-                  TgaImage* image) {
+void Rasterization(const std::array<Vector4, 3>& v,
+                   std::vector<double>& zbuffer, const double width,
+                   IShader* shader) {
+  // use BB
   // optimization possible?
-  double xmin = std::floor(std::min(v0.x, std::min(v1.x, v2.x)));
-  double xmax = std::ceil(std::max(v0.x, std::max(v1.x, v2.x)));
-  double ymin = std::floor(std::min(v0.y, std::min(v1.y, v2.y)));
-  double ymax = std::ceil(std::max(v0.y, std::max(v1.y, v2.y)));
+  double xmin = std::floor(std::min(v[0][0], std::min(v[1][0], v[2][0])));
+  double xmax = std::ceil(std::max(v[0][0], std::max(v[1][0], v[2][0])));
+  double ymin = std::floor(std::min(v[0][1], std::min(v[1][1], v[2][1])));
+  double ymax = std::ceil(std::max(v[0][1], std::max(v[1][1], v[2][1])));
 
-  double dx = v1.x - v0.x;
-  double dy = v1.y - v0.y;
-  double dx2 = v2.x - v0.x;
-  double dy2 = v2.y - v0.y;
-  double a2_multiplier = dx * dy2 - dy * dx2;
-  if (0 == a2_multiplier) {
-    // The three vertices cannot represent a triangle. Maybe a line or a point.
+  // check three vertices at one line
+  // 123 abc
+  Vector4 ab = v[1] - v[0];
+  Vector4 bc = v[2] - v[1];
+  if (1e-6 > vector_m::Cross(ab, bc).Norm()) {
     return;
   }
-  // int width = image->width_;
-  int width = image->GetWidth();
+
   for (int i = xmin; i <= xmax; ++i) {
     for (int j = ymin; j <= ymax; ++j) {
-      double dx_p = i * 1. - v0.x;
-      double dy_p = j * 1. - v0.y;
-      // uv can multipled by dx*v_multiplier to reduce division calculation cost
-      double a2 = (dy_p * dx - dx_p * dy) / a2_multiplier;
-      double a1 = (dx_p - a2 * dx2) / dx;
-      double a0 = 1. - a1 - a2;
-      if (0 <= a0 && 0 <= a1 && 0 <= a2) {
-        double z_p = a0 * v0.z + a1 * v1.z + a2 * v2.z;
+      double ap_x = i * 1. - v[0][0];
+      double ap_y = j * 1. - v[0][1];
+      Vector3 x_component{ab[0], bc[0], ap_x};
+      Vector3 y_component{ab[1], bc[1], ap_y};
+      Vector3 product = vector_m::Cross(x_component, y_component);
+      product = product / (-product[2]);
+      if (1 >= product[0] && 0 <= product[1] && product[0] >= product[1]) {
+        Vector3 barycentric{1. - product[0], product[0] - product[1],
+                            product[1]};
+        double interpo_z =
+            vector_m::Dot(barycentric, Vector3{v[0][2], v[1][2], v[2][2]});
         int pixel_index = j * width + i;
-        if (z_p > zbuffer[pixel_index]) {
-          zbuffer[pixel_index] = z_p;
-          int u = static_cast<int>((a0 * vt0.x + a1 * vt1.x + a2 * vt2.x) *
-                                   texture.GetWidth());
-          int v = static_cast<int>((a0 * vt0.y + a1 * vt1.y + a2 * vt2.y) *
-                                   texture.GetHeight());
-          image->SetColor(i, j, texture.GetColor(u, v));
+        if (interpo_z > zbuffer[pixel_index]) {
+          zbuffer[pixel_index] = interpo_z;
+          shader->fragment_process(Vector2Int{i, j}, barycentric);
         }
       }
     }
   }
 }
 
-void DrawTriangle(const Vector3F& v0, const Vector3F& v1, const Vector3F& v2,
-                  const Vector2F& vt0, const Vector2F& vt1, const Vector2F& vt2,
-                  std::vector<double>& zbuffer, const TgaImage& texture,
-                  const double camera_z, const double screen_z,
-                  TgaImage* image) {
-  if (!image) {
-    std::cerr << "Null image pointer was past.\n";
-    return;
-  }
-  if (camera_z <= screen_z) {
-    std::cerr << "Incorrect camera z-position behind screen.\n";
-    return;
-  }
-
-  int sc_width = image->GetWidth();
-  int sc_height = image->GetHeight();
-
-  Vector3F sc_v0 = PerspectiveProjectionTransformation(v0, camera_z, screen_z,
-                                                       sc_width, sc_height);
-  Vector3F sc_v1 = PerspectiveProjectionTransformation(v1, camera_z, screen_z,
-                                                       sc_width, sc_height);
-  Vector3F sc_v2 = PerspectiveProjectionTransformation(v2, camera_z, screen_z,
-                                                       sc_width, sc_height);
-
-  // TriangleByLineSwap(sc_v0.x, sc_v0.y, sc_v1.x, sc_v1.y, sc_v2.x, sc_v2.y,
-  //                    image, white);
-
-  TriangleByBB(sc_v0, sc_v1, sc_v2, vt0, vt1, vt2, zbuffer, texture, camera_z,
-               screen_z, image);
-}
-
-void readModel();
+const int width = 800;
+const int height = 800;
+Vector3 camera_pos{-2, 0, 2};
+Vector3 gaze_dir{1, 0, -1};
+Vector3 up{0, 1, 0};
 
 int main(int argc, char const* argv[]) {
-  // TgaImage image(100, 100, TgaImage::kRGB);
-  // Vector2Int a(10, 15), b(50, 40), c(70, 60);
-  // DrawTriangle(a, b, c, &image, white);
-  // Vector2Int d(70, 15), e(40, 5);
-  // DrawTriangle(b, d, c, &image, red);
-  // image.WriteTgaFile("out.tga", false, false, false);
-  readModel();
-  return 0;
-}
-
-void readModel() {
-  int width = 800;
-  int height = 800;
-
   ObjModel* head = new ObjModel("/home/tea/my-renderer/obj/african_head.obj");
-  TgaImage* texture = new TgaImage();
   TgaImage* image = new TgaImage(width, height, TgaImage::kRGB);
-  texture->ReadTgaFile("/home/tea/my-renderer/obj/african_head_diffuse.tga");
+  TextureShader shader("/home/tea/my-renderer/obj/african_head_diffuse.tga");
+  shader.RegisterCanvas(image);
+  shader.LookAt(camera_pos, gaze_dir, up);
+  shader.Projection(-1.5);
+  shader.SetViewPort(width, height);
 
   int pixel_num = width * height;
   std::vector<double> zbuffer(pixel_num, std::numeric_limits<double>::lowest());
 
   int face_num = head->GetFaceNum();
+  std::array<Vector4, 3> vertices;
+  std::array<Vector2, 3> textures;
   for (int i = 0; i < face_num; ++i) {
     Vector3Int face = head->GetFaceVertices(i);
     Vector3Int face_texture = head->GetFaceVertexTextures(i);
-    Vector3F v0 = head->GetVertex(face[0]);
-    Vector3F v1 = head->GetVertex(face[1]);
-    Vector3F v2 = head->GetVertex(face[2]);
-    Vector2F uv0 = head->GetTexture(face_texture[0]);
-    Vector2F uv1 = head->GetTexture(face_texture[1]);
-    Vector2F uv2 = head->GetTexture(face_texture[2]);
-    DrawTriangle(v0, v1, v2, uv0, uv1, uv2, zbuffer, *texture, 3., 1., image);
+    for (int i = 0; i < 3; i++) {
+      vertices[i] = shader.vertex_process(
+          vector_m::HomogeneousCoords(head->GetVertex(face[i])));
+      shader.SetTextureCoordinates(head->GetTexture(face_texture[i]), i);
+    }
+    Rasterization(vertices, zbuffer, width, &shader);
   }
-  std::cerr << "Finish rasterization.\n";
+  shader.UnregisterCanvas();
   image->WriteTgaFile("african-head.tga", false, false, false);
-  std::cerr << "Image IO finish.\n";
-  return;
+  delete head;
+  delete image;
 }

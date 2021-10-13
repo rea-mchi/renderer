@@ -26,7 +26,7 @@ ObjModel::ObjModel(const std::string& filename) {
     if (0 == line.compare(0, 2, "v ")) {
       // geometric vertices
       iss.ignore(std::numeric_limits<std::streamsize>::max(), ' ');
-      Vector3F vertex;
+      Vector3 vertex;
       int i = 0;
       std::string value;
       while (iss && 3 > i) {
@@ -38,7 +38,7 @@ ObjModel::ObjModel(const std::string& filename) {
     } else if (0 == line.compare(0, 2, "vt")) {
       // texture coordinates
       iss.ignore(std::numeric_limits<std::streamsize>::max(), ' ');
-      Vector2F texture;
+      Vector2 texture;
       int i = 0;
       std::string value;
       while (iss && 2 > i) {
@@ -52,7 +52,7 @@ ObjModel::ObjModel(const std::string& filename) {
       // vertex normal
       // original data might not be unit vectors, so normalize manually
       iss.ignore(std::numeric_limits<std::streamsize>::max(), ' ');
-      Vector3F normal;
+      Vector3 normal;
       int i = 0;
       std::string value;
       while (iss && 3 > i) {
@@ -60,7 +60,7 @@ ObjModel::ObjModel(const std::string& filename) {
         normal[i] = std::stod(value);
         ++i;
       }
-      normals_.push_back(vector3::Normalize(normal));
+      normals_.push_back(normal);
     } else if (0 == line.compare(0, 2, "f ")) {
       // polygonal face elemnt
       iss.ignore(std::numeric_limits<std::streamsize>::max(), ' ');
@@ -88,26 +88,23 @@ ObjModel::ObjModel(const std::string& filename) {
 
 ObjModel::~ObjModel() = default;
 
-const Vector3F& ObjModel::GetVertex(int index) const {
-  return vertices_[index];
-}
+Vector3 ObjModel::GetVertex(int index) const { return vertices_[index]; }
 
-const Vector2F& ObjModel::GetTexture(int index) const {
-  return textures_[index];
-}
+Vector2 ObjModel::GetTexture(int index) const { return textures_[index]; }
 
-const Vector3F& ObjModel::GetNormal(int index) const { return normals_[index]; }
-
-const Vector3Int& ObjModel::GetFaceVertices(int index) const {
-  return faces_vertices_[index];
-}
+Vector3 ObjModel::GetNormal(int index) const { return normals_[index]; }
 
 std::size_t ObjModel::GetFaceNum() const { return faces_vertices_.size(); }
 
-const Vector3Int& ObjModel::GetFaceVertexTextures(int index) const {
+Vector3Int ObjModel::GetFaceVertices(int index) const {
+  return faces_vertices_[index];
+}
+
+Vector3Int ObjModel::GetFaceVertexTextures(int index) const {
   return faces_vertex_textures_[index];
 }
-const Vector3Int& ObjModel::GetFaceVertexNormals(int index) const {
+
+Vector3Int ObjModel::GetFaceVertexNormals(int index) const {
   return faces_vertex_normals_[index];
 }
 
