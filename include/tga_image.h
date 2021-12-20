@@ -102,8 +102,8 @@ class TgaImage {
                      const int bytespp);
   bool FlipHorizontally();
   bool FlipVertically();
-  void SetColor(int x, int y, const TgaColor& color);
-  TgaColor GetColor(int x, int y) const;
+  void setColor(int x, int y, const TgaColor color);
+  TgaColor getColor(int x, int y) const;
 
  private:
   std::vector<std::uint8_t> data_;

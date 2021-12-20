@@ -2,250 +2,174 @@
 #define GEOMETRY_H_
 
 #include <array>
+#include <cassert>
 #include <cmath>
-#include <iostream>
+#include <limits>
 
+////////////////////
+// vector
 template <typename T, int N>
-class Vector {
+class Vec {
  public:
-  Vector();
-  Vector(std::initializer_list<T> list);
-  Vector(const Vector& vector);
-  Vector& operator=(const Vector& rhs);
-  ~Vector() = default;
+  Vec() : data_{} {}
+  Vec(std::initializer_list<T> l) {
+    assert(N == l.size());
+    auto begin = l.begin();
+    for (int i = 0; i < N; ++i) {
+      data_[i] = *(begin + i);
+    }
+  }
+  Vec(const Vec& v) = default;
+  Vec& operator=(const Vec& rhs) = default;
+  ~Vec() = default;
 
-  T& operator[](std::size_t n) { return data_[n]; }
-  const T& operator[](std::size_t n) const { return data_[n]; }
+  T& operator[](int i) {
+    assert(i < N);
+    return data_[i];
+  }
 
-  double Norm() const;
+  const T& operator[](int i) const {
+    assert(i < N);
+    return data_[i];
+  }
+
+  double norm() const {
+    double norm = 0;
+    for (int i = 0; i < N; ++i) {
+      norm += data_[i] * data_[i];
+    }
+    return std::sqrt(norm);
+  }
+
+  friend Vec operator*(const Vec& lhs, const double rhs) {
+    Vec v = lhs;
+    for (int i = 0; i < N; ++i) {
+      v.data_[i] *= rhs;
+    }
+    return v;
+  }
+
+  friend Vec operator*(const double lhs, const Vec& rhs) { return rhs * lhs; }
+
+  friend Vec operator/(const Vec& numerator, const double denominator) {
+    assert(std::abs(denominator) > std::numeric_limits<double>::epsilon());
+    Vec v = numerator;
+    for (int i = 0; i < N; ++i) {
+      v.data_[i] /= denominator;
+    }
+    return v;
+  }
 
  private:
   std::array<T, N> data_;
 };
 
-using Vector2 = Vector<double, 2>;
-using Vector2Int = Vector<int, 2>;
-using Vector3 = Vector<double, 3>;
-using Vector3Int = Vector<int, 3>;
-using Vector4 = Vector<double, 4>;
+template <typename T, int N>
+Vec<T, N> operator*(const Vec<T, N>& lhs, const double rhs);
 
 template <typename T, int N>
-Vector<T, N>::Vector() : data_() {
-  data_.fill(0);
-}
+Vec<T, N> operator*(const double lhs, const Vec<T, N>& rhs);
 
 template <typename T, int N>
-Vector<T, N>::Vector(std::initializer_list<T> list) : data_() {
-  if (N == list.size()) {
-    auto it = list.begin();
-    for (int i = 0; i < N; ++i, ++it) {
-      data_[i] = *it;
-    }
-  } else {
-    data_.fill(0);
-  }
-}
+Vec<T, N> operator/(const Vec<T, N>& numerator, const double denominator);
 
-template <typename T, int N>
-Vector<T, N>::Vector(const Vector& vector) : data_() {
-  for (int i = 0; i < N; ++i) {
-    data_[i] = vector[i];
-  }
-}
+using Vec2 = Vec<double, 2>;
+using Vec3 = Vec<double, 3>;
+using Vec4 = Vec<double, 4>;
+using Vec3Int = Vec<int, 3>;
 
-template <typename T, int N>
-Vector<T, N>& Vector<T, N>::operator=(const Vector& rhs) {
-  for (int i = 0; i < N; ++i) {
-    data_[i] = rhs[i];
-  }
-  return *this;
-}
-
-template <typename T, int N>
-double Vector<T, N>::Norm() const {
-  double norm2 = 0;
-  for (int i = 0; i < N; ++i) {
-    norm2 += data_[i] * data_[i];
-  }
-  return std::sqrt(norm2);
-}
-
-// arithmetic operator overloading
-template <typename T, int N>
-Vector<T, N> operator+(const Vector<T, N>& lhs, const T& rhs) {
-  Vector<T, N> res = lhs;
-  for (int i = 0; i < N; ++i) {
-    res[i] += rhs;
-  }
-  return res;
-}
-template <typename T, int N>
-Vector<T, N> operator-(const Vector<T, N>& lhs, const T& rhs) {
-  Vector<T, N> res = lhs;
-  for (int i = 0; i < N; ++i) {
-    res[i] -= rhs;
-  }
-  return res;
-}
-template <typename T, int N>
-Vector<T, N> operator*(const Vector<T, N>& lhs, const T& rhs) {
-  Vector<T, N> res = lhs;
-  for (int i = 0; i < N; ++i) {
-    res[i] *= rhs;
-  }
-  return res;
-}
-template <typename T, int N>
-Vector<T, N> operator*(const T& lhs, const Vector<T, N>& rhs) {
-  return rhs * lhs;
-}
-template <typename T, int N>
-Vector<T, N> operator/(const Vector<T, N>& lhs, const T& rhs) {
-  if (0 == rhs) {
-    std::cerr << "Vector can't be divided by 0.\n";
-    exit(1);
-  }
-  Vector<T, N> res = lhs;
-  for (int i = 0; i < N; ++i) {
-    res[i] /= rhs;
-  }
-  return res;
-}
-template <typename T, int N>
-Vector<T, N> operator+(const Vector<T, N>& lhs, const Vector<T, N>& rhs) {
-  Vector<T, N> res = lhs;
-  for (int i = 0; i < N; ++i) {
-    res[i] += rhs[i];
-  }
-  return res;
-}
-template <typename T, int N>
-Vector<T, N> operator-(const Vector<T, N>& lhs, const Vector<T, N>& rhs) {
-  Vector<T, N> res = lhs;
-  for (int i = 0; i < N; ++i) {
-    res[i] -= rhs[i];
-  }
-  return res;
-}
-
-namespace vector_m {
+namespace vector {
 template <int N>
-double Dot(const Vector<double, N>& v1, const Vector<double, N>& v2) {
-  double sum = 0;
-  for (int i = 0; i < N; ++i) {
-    sum += v1[i] * v2[i];
-  }
-  return sum;
-}
-
-Vector3 Cross(const Vector2& v1, const Vector2& v2);
-Vector3 Cross(const Vector3& v1, const Vector3& v2);
-Vector3 Cross(const Vector4& v1, const Vector4& v2);
-
-template <int N>
-Vector<double, N> Normalize(const Vector<double, N>& v) {
-  double norm = v.Norm();
-  if (0 == norm) {
-    return v;
-  }
-
-  return v / norm;
-}
-
-Vector4 HomogeneousCoords(const Vector3& vector3);
-}  // namespace vector_m
-
-// matrix
-template <typename T, int ROW, int COL>
-class Matrix {
- public:
-  Matrix();
-  Matrix(const Matrix& m);
-  Matrix& operator=(const Matrix& rhs);
-  ~Matrix() = default;
-
-  T& operator()(int i, int j) { return data_[i * COL + j]; }
-  const T& operator()(int i, int j) const { return data_[i * COL + j]; }
-
- private:
-  std::array<T, ROW * COL> data_;
+Vec<double, N> normalize(const Vec<double, N>& v) {
+  return v / v.norm();
 };
 
-using SMatrix3 = Matrix<double, 3, 3>;
-using SMatrix4 = Matrix<double, 4, 4>;
+Vec3 cross(const Vec3& v1, const Vec3& v2);
+}  // namespace vector
 
-template <typename T, int ROW, int COL>
-Matrix<T, ROW, COL>::Matrix() : data_() {
-  data_.fill(0);
-}
+////////////////////
+// matrix
+template <int Row, int Col>
+class Mat {
+ public:
+  Mat() : data_{} {}
+  Mat(const Mat& m) = default;
+  Mat& operator=(const Mat& rhs) = default;
+  ~Mat() = default;
 
-template <typename T, int ROW, int COL>
-Matrix<T, ROW, COL>::Matrix(const Matrix& m) : data_() {
-  for (int i = 0; i < ROW; ++i) {
-    for (int j = 0; j < COL; ++j) {
-      data_[i * COL + j] = m(i, j);
+  double& operator()(int i, int j) {
+    assert(i < Row && j < Col);
+    return data_[i * Col + j];
+  }
+
+  const double& operator()(int i, int j) const {
+    assert(i < Row && j < Col);
+    return data_[i * Col + j];
+  }
+
+  Vec<double, Row> extractNthCol(int n) const {
+    assert(n < Col);
+    Vec<double, Row> c;
+    for (int i = 0; i < Row; ++i) {
+      c[i] = data_[i * Col + n];
+    }
+    return c;
+  }
+
+  template <int N>
+  void replaceNthCol(int n, const Vec<double, N>& src) {
+    assert(n < Col && N <= Row);
+    for (int i = 0; i < N; ++i) {
+      data_[i * Col + n] = src[i];
     }
   }
-}
 
-template <typename T, int ROW, int COL>
-Matrix<T, ROW, COL>& Matrix<T, ROW, COL>::operator=(const Matrix& rhs) {
-  for (int i = 0; i < ROW; ++i) {
-    for (int j = 0; j < COL; ++j) {
-      data_[i * COL + j] = rhs(i, j);
+  template <int N>
+  void replaceNthRow(int n, const Vec<double, N>& src) {
+    assert(n < Row && N <= Col);
+    for (int j = 0; j < N; ++j) {
+      data_[j + n * Col] = src[j];
     }
   }
-  return *this;
-}
 
-// operator
-// m[ROW][COM]*m[COM][COL]
-template <typename T, int ROW, int COM, int COL>
-Matrix<T, ROW, COL> operator*(const Matrix<T, ROW, COM>& lhs,
-                              const Matrix<T, COM, COL>& rhs) {
-  Matrix<T, ROW, COL> res;
-  for (int i = 0; i < ROW; ++i) {
-    for (int j = 0; j < COL; ++j) {
-      T value = 0;
-      for (int k = 0; k < COM; ++k) {
-        value += lhs(i, k) * rhs(k, j);
+ private:
+  std::array<double, Row * Col> data_;
+};
+
+using Mat3 = Mat<3, 3>;
+using Mat4 = Mat<4, 4>;
+
+template <int Row, int Col, int Com>
+Mat<Row, Col> operator*(const Mat<Row, Com>& m1, const Mat<Com, Col>& m2) {
+  Mat<Row, Col> m;
+  for (int i = 0; i < Row; ++i) {
+    for (int j = 0; j < Col; ++j) {
+      double sum = 0;
+      for (int k = 0; k < Com; ++k) {
+        sum += m1(i, k) * m2(k, j);
       }
-      res(i, j) = value;
+      m(i, j) = sum;
     }
   }
-  return res;
+  return m;
 }
 
-// matrix*vector->vector
-// 返回一定是列向量
-template <typename T, int ROW, int COM>
-Vector<T, ROW> operator*(const Matrix<T, ROW, COM>& lhs,
-                         const Vector<T, COM>& rhs) {
-  Vector<T, ROW> res;
-  for (int i = 0; i < ROW; ++i) {
-    T value = 0;
-    for (int j = 0; j < COM; ++j) {
-      value += lhs(i, j) * rhs[j];
+template <int Row, int Com>
+Vec<double, Row> operator*(const Mat<Row, Com>& m, const Vec<double, Com>& v) {
+  Vec<double, Row> v2;
+  for (int i = 0; i < Row; ++i) {
+    double sum = 0;
+    for (int j = 0; j < Com; ++j) {
+      sum += m(i, j) * v[j];
     }
-    res[i] = value;
+    v2[i] = sum;
   }
-  return res;
+  return v2;
 }
 
-namespace matrix_m {
-template <typename T, int ROW, int COL>
-Matrix<T, COL, ROW> Transpose(const Matrix<T, ROW, COL>& m) {
-  Matrix<T, COL, ROW> t;
-  for (int i = 0; i < ROW; ++i) {
-    for (int j = 0; j < COL; ++j) {
-      t(j, i) = m(i, j);
-    }
-  }
-  return t;
-}
-
-SMatrix3 IMatrix3();
-SMatrix4 IMatrix4();
-}  // namespace matrix_m
+namespace matrix {
+Mat3 genIMat3();
+Mat4 genIMat4();
+}  // namespace matrix
 
 #endif  // GEOMETRY_H_
